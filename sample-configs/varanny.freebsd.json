@@ -13,25 +13,13 @@
       }
     },
     {
-      "Name": "G90 xara FM",
+      "Name": "FT818ND xara FM",
       "Type": "fm",
       "Cmd": "/usr/local/bin/xara-varafm",
       "DefaultConfig": "/usr/local/etc/varanny/xara-fm.ini",
       "CatCtrl": {
-        "Port": 4532,
+        "Port": 4533,
         "Dialect": "hamlib"
-      }
-    },
-    {
-      "Name": "FT818ND-HF",
-      "Type": "hf",
-      "Cmd": "/usr/local/bin/xara-varahf",
-      "DefaultConfig": "/usr/local/etc/varanny/xara-hf.ini",
-      "CatCtrl": {
-        "Port": 4532,
-        "Dialect": "hamlib",
-        "Cmd": "/usr/local/bin/rigctld",
-        "Args": "-m 1020 -s 38400 -r /dev/cuaU0"
       }
     }
   ]
