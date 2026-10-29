@@ -1,0 +1,14 @@
+#!/bin/sh
+# Run rigctld on the CP2102N whose USB serial number is $1, wherever it enumerated.
+# Usage: rigctld-run SERNUM rigctld-args...
+want=$1; shift
+for u in $(sysctl -N dev.uslcom 2>/dev/null | sed -n 's/^dev\.uslcom\.\([0-9]*\)\.%pnpinfo$/\1/p'); do
+	case "$(sysctl -n dev.uslcom.$u.%pnpinfo)" in
+	*sernum=\"$want\"*)
+		tty=$(sysctl -n dev.uslcom.$u.ttyname)
+		[ -c /dev/cua$tty ] && exec /usr/local/bin/rigctld -r /dev/cua$tty "$@"
+		;;
+	esac
+done
+echo "rigctld-run: no CP2102N with serial $want" >&2
+exit 1

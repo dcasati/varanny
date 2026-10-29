@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# PROVIDE: rigctld
+# REQUIRE: LOGIN devd
+# KEYWORD: shutdown
+#
+# One rigctld per radio listed in /usr/local/etc/digirig.conf.
+# rigctld_enable="YES"
+# rigctld_profiles="g90 ft818"   (default: every radio in the conf)
+# service rigctld start|stop|status [radio]
+
+. /etc/rc.subr
+
+name=rigctld
+rcvar=rigctld_enable
+load_rc_config $name
+
+: ${rigctld_enable:=NO}
+: ${rigctld_runas:=uucp}
+: ${rigctld_conf:=/usr/local/etc/digirig.conf}
+: ${rigctld_args:="-T 0.0.0.0 -C rts_state=OFF,dtr_state=OFF"}
+: ${rigctld_profiles:=$(awk "!/^#/ && NF {print \$1}" ${rigctld_conf})}
+
+rc_cmd=$1
+procname=/usr/sbin/daemon
+command=/usr/sbin/daemon
+start_precmd="rigctld_prestart"
+
+rigctld_prestart()
+{
+	install -d -o ${rigctld_runas} -m 755 /var/run/${name}
+	/usr/local/libexec/digirig-link
+}
+
+if [ -z "$2" ]; then
+	for p in ${rigctld_profiles}; do
+		echo "===> rigctld $p"
+		/usr/local/etc/rc.d/rigctld ${rc_cmd} $p
+	done
+	exit 0
+fi
+
+profile=$2
+set -- $(awk -v p="$profile" "\$1 == p {print \$2, \$3, \$4, \$5}" ${rigctld_conf})
+if [ $# -ne 4 ]; then
+	echo "rigctld: no radio \"$profile\" in ${rigctld_conf}" >&2
+	exit 1
+fi
+pidfile=/var/run/${name}/${profile}.pid
+command_args="-r -R 5 -P ${pidfile} -u ${rigctld_runas} /usr/local/libexec/rigctld-run $1 -m $2 -s $3 -t $4 ${rigctld_args}"
+
+run_rc_command "${rc_cmd}"
