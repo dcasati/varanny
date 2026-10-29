@@ -135,6 +135,8 @@ sudo apt-get install -y libatomic1
 CGO_ENABLED=1 CGO_LDFLAGS="-latomic" go build
 ```
 
+On FreeBSD, `pkg install go` and build as above; the port check uses `sockstat(1)`.
+
 To cross compile a Windows build from a *nix OS:
 ```
 CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build
