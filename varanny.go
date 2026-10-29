@@ -43,6 +43,7 @@ type Config struct {
 	Delay                   *int    `json:"Delay"` // allow 0 value, defaults to 10
 	Modems                  []Modem `json:"Modems"`
 	Port                    int     `json:"Port"`
+	EnableRemoteShutdown bool `json:"EnableRemoteShutdown,omitempty"`
 }
 type Modem struct {
 	Name           string  `json:"Name"`
@@ -50,6 +51,7 @@ type Modem struct {
 	Cmd            string  `json:"Cmd"`
 	Args           string  `json:"Args"`
 	Config         string  `json:"Config"`
+	DefaultConfig string `json:"DefaultConfig"`
 	AudioInputName string  `json:"AudioInputName"`
 	CatCtrl        CatCtrl `json:"CatCtrl,omitempty"`
 	mu             sync.Mutex
@@ -127,8 +129,16 @@ func (p *program) validateConfig() {
 			}
 		}
 
+		var varaDefaultConfigFile = modem.DefaultConfig
+		if varaDefaultConfigFile != "" {
+			err := assertConfigFile(varaDefaultConfigFile)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
 		// Figure out .ini file name for this modem
-		iniFilePath, err := specifiedIniConfigPath(modem)
+		iniFilePath, err := specifiedIniConfigPath(modem, varaDefaultConfigFile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -213,12 +223,12 @@ func createCommand(multiWriter io.Writer, path string, args ...string) *exec.Cmd
 	return cmd
 }
 
-func defaultIniConfigPath(modem *Modem) (string, error) {
+func defaultIniConfigPath(modem *Modem, varaDefaultConfigFile string) (string, error) {
 	// Figure out .ini file name for this modem
-	iniFilePath, _ := DefaultVaraConfigFile(modem.Cmd)
+	iniFilePath, _ := DefaultVaraConfigFile(modem.Cmd, varaDefaultConfigFile)
 	if !FileExists(iniFilePath) {
 		// Try args for linux implementations
-		iniFilePath, _ = DefaultVaraConfigFile(modem.Args)
+		iniFilePath, _ = DefaultVaraConfigFile(modem.Args, varaDefaultConfigFile)
 		if !FileExists(iniFilePath) {
 			log.Println("ERROR cannot find default .ini file for modem", modem.Name)
 			return "", fmt.Errorf("cannot find default .ini file for modem %s", modem.Name)
@@ -227,11 +237,11 @@ func defaultIniConfigPath(modem *Modem) (string, error) {
 	return iniFilePath, nil
 }
 
-func specifiedIniConfigPath(modem *Modem) (string, error) {
+func specifiedIniConfigPath(modem *Modem, varaDefaultConfigFile string) (string, error) {
 	iniFilePath := modem.Config
 	if iniFilePath == "" {
 		// If nothing specified, use default
-		return defaultIniConfigPath(modem)
+		return defaultIniConfigPath(modem, varaDefaultConfigFile)
 	}
 	return iniFilePath, nil
 }
@@ -371,7 +381,8 @@ func handleConnection(conn net.Conn, p *program) {
 							// Swap the config file to the one defined in the modem if needed
 							if modem.Config != "" {
 
-								configPath, err = defaultIniConfigPath(modem)
+								var varaDefaultConfigFile = modem.DefaultConfig
+								configPath, err = defaultIniConfigPath(modem, varaDefaultConfigFile)
 
 								if err != nil {
 									conn.Write([]byte("ERROR " + err.Error() + "\n"))
@@ -452,7 +463,8 @@ func handleConnection(conn net.Conn, p *program) {
 						defer modem.mu.Unlock()
 
 						// Figure out .ini file name for this modem
-						iniFilePath, err := specifiedIniConfigPath(modem)
+						var varaDefaultConfigFile = modem.DefaultConfig
+						iniFilePath, err := specifiedIniConfigPath(modem, varaDefaultConfigFile)
 						if err != nil {
 							conn.Write([]byte("ERROR " + err.Error() + "\n"))
 							return
@@ -507,6 +519,18 @@ func handleConnection(conn net.Conn, p *program) {
 							conn.Write([]byte("  CatCtrl.Dialect: " + modem.CatCtrl.Dialect + "\n"))
 							conn.Write([]byte("  CatCtrl.Cmd: " + modem.CatCtrl.Cmd + "\n"))
 							conn.Write([]byte("  CatCtrl.Args: " + modem.CatCtrl.Args + "\n"))
+						}
+					case "shutdown":
+						if !p.EnableRemoteShutdown {
+							conn.Write([]byte("ERROR remote shutdown disabled\n"))
+						} else {
+							conn.Write([]byte("OK\n"))
+							go func() {
+								time.Sleep(300 * time.Millisecond)
+								if err := hostPowerOff(); err != nil {
+									log.Println("host poweroff:", err)
+								}
+							}()
 						}
 					default:
 						conn.Write([]byte("Invalid command\n"))

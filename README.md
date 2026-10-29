@@ -1,6 +1,6 @@
 # varanny
 
-`varanny` is an enhancement tool for VARA, a widely used software modem in amateur radio digital transmissions. VARA functions through two TCP ports - one for commands, the other for data. This TCP/IP interaction enables the VARA modem software to run on a radio-connected, headless computer, while client applications operate on a separate network device. However, since VARA wasn't designed to function as a service, this setup comes with certain limitations.
+`varanny` is a lightweight service wrapper for the VARA software modem, designed to simplify headless and remote amateur radio operations. It enables automatic service discovery over the network using DNS-SD, allowing clients like RadioMail to locate and connect to VARA instances without manual configuration. `varanny` also manages the starting and stopping of VARA and optional rig control agents, handles multiple modem profiles by swapping .ini config files, and ensures reliable operation in environments like Wine where VARA may not rebind to ports correctly. It turns VARA into a more flexible, network-friendly service.
 
 ## Overview
 
@@ -39,8 +39,6 @@
 │    iPhone (iOS)    │                │    Headless Computer     │              │ Sound Card Adapter │
 └────────────────────┘                └──────────────────────────┘              └────────────────────┘
 ```
-
-`varanny` steps in to address these limitations, acting as a 'nanny' for VARA. It offers two primary capabilities:
 
 ## Service Announcement
 `varanny` announces the service through DNS Service Discovery, enabling clients to discover an active VARA instance and automatically retrieve the IP and command port configured for that instance. In VARA modems, the data port number is always one more than the command port number.
@@ -91,6 +89,18 @@ Connections to `varanny` are session-oriented. A client connects, requests to st
 * `monitor <modem name>` - Connects to the input audio interface defined for this modem. Returns the interface name, followed by continous stream of audio level in dbFS.
 * `config` - Echo the `varanny.json` config file content
 * `version` - Returns varanny version
+* `shutdown` - Power off the machine (Linux only; see below)
+
+### Remote host shutdown (Linux)
+
+When `"EnableRemoteShutdown": true` is set in `varanny.json`, the `shutdown` command replies `OK` and then requests a kernel power-off via `reboot(2)`. The process does not run as root; it needs the **`CAP_SYS_BOOT`** capability. Under systemd, use a dedicated service user and a unit snippet such as:
+
+```ini
+CapabilityBoundingSet=CAP_SYS_BOOT
+AmbientCapabilities=CAP_SYS_BOOT
+```
+
+If the capability is missing, the log will show a permission error after `OK`. Anyone who can reach the command port can shut down the host—use a firewall or private network as appropriate.
 
 ### Multiple Configurations
 VARA doesn't offer command line configuration options. Therefore, changes like sound card name, PTT com port, etc., need to be made through its GUI. `varanny` can help manage multiple configurations for you. It automatically swaps the `.ini` configuration file that VARA reads, allowing for seamless configuration changes before each session and restoring the default settings afterward. To create a new configuration, follow these steps:  
@@ -216,9 +226,8 @@ Follow these guides and watch the videos to learn how to utilize `varanny` to cr
 * [VARA HotSpot Windows Setup Guide](https://github.com/islandmagic/varanny/wiki/VARA-HotSpot-Windows-Setup-Guide)
 * [VARA HotSpot Linux Setup Guide](https://github.com/islandmagic/varanny/wiki/VARA-HotSpot-Linux-Setup-Guide)
 
-[![Video](https://img.youtube.com/vi/7bOmWUk1XhM/maxresdefault.jpg)](https://www.youtube.com/watch?v=7bOmWUk1XhM)
-
-[![Video](https://img.youtube.com/vi/kPDTH4L319Q/maxresdefault.jpg)](https://www.youtube.com/watch?v=kPDTH4L319Q)
+Scripts to create a complete headless VARA solution on a stick PC
+* [VARA on a stick](https://github.com/islandmagic/vara-on-a-stick)
 
 ## Troubleshooting
 
@@ -328,6 +337,11 @@ stop
 OK
 Connection closed by foreign host.
 ```
+
+### Support
+
+If you encounter a bug, please open an issue on GitHub.
+For questions, help, or sharing your configurations, visit the [forum](https://forum.islandmagic.co/c/varanny)
 
 ### Logs
 `varanny` logs output to the standard system logs.

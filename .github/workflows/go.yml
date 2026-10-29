@@ -6,6 +6,9 @@ on:
       - '*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,10 +34,10 @@ jobs:
 
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: 1.21.4
         id: go
@@ -54,7 +57,7 @@ jobs:
           zip "varanny-${{ matrix.os }}-${{ matrix.arch }}.zip" "varanny${{ matrix.ext }}" "varanny.json"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: varanny-${{ matrix.os }}-${{ matrix.arch }}.zip
           path: varanny-${{ matrix.os }}-${{ matrix.arch }}.zip
@@ -62,31 +65,19 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Upload Release Assets
-        id: upload_release_assets
-        uses: dwenegar/upload-release-assets@v1
+      - name: Create GitHub release and upload assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          release_id: ${{ steps.create_release.outputs.id }}
-          assets_path: "./artifacts/*.zip"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" --title "Release $tag" --generate-notes || true
+          gh release upload "$tag" artifacts/**/*.zip --clobber
