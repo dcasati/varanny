@@ -1,0 +1,32 @@
+#!/bin/sh
+# Run xara for varanny: xara-varanny CONFIG
+# varanny stops the modem with SIGTERM as soon as the client says stop, which can
+# be right after it asked for a disconnect. Hold the SIGTERM until an open link
+# reports DISCONNECTED (at most 20 s) so the other station sees the link close.
+conf=$1
+run=$(mktemp -d -t xara-varanny) || exit 1
+mkfifo $run/out
+/usr/local/bin/xara --config "$conf" --addr 0.0.0.0 --registered > $run/out 2>&1 &
+xara=$!
+while IFS= read -r l; do
+	printf "%s\n" "$l"
+	case $l in
+	*"< CONNECTED "*) : > $run/up ;;
+	*"< DISCONNECTED"*) rm -f $run/up ;;
+	esac
+done < $run/out &
+reader=$!
+stop() {
+	n=0
+	[ -e $run/up ] && echo "xara-varanny: waiting for the link to disconnect"
+	while [ -e $run/up ] && [ $n -lt 40 ]; do sleep 0.5; n=$((n + 1)); done
+	kill -TERM $xara 2>/dev/null
+}
+trap stop TERM INT HUP
+wait $xara
+st=$?
+# wait returns early when a trapped signal arrives; keep waiting for xara itself.
+while kill -0 $xara 2>/dev/null; do wait $xara; st=$?; done
+wait $reader
+rm -rf $run
+exit $st
