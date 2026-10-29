@@ -52,6 +52,7 @@ sound card.
 | `rc.d/rigctld` | `/usr/local/etc/rc.d/rigctld` | One `rigctld` per radio in `digirig.conf` |
 | `rc.d/varanny` | `/usr/local/etc/rc.d/varanny` | Runs `varanny` as the station user |
 | `bin/xara-varahf`, `bin/xara-varafm` | `/usr/local/bin/` | Wrappers: varanny passes `Args` as one argument, xara needs several |
+| `libexec/xara-varanny` | `/usr/local/libexec/xara-varanny` | Runs xara for the wrappers and holds varanny's SIGTERM until an open link has disconnected (max 20 s) |
 | `etc/varanny/xara-hf.ini`, `xara-fm.ini` | `/usr/local/etc/varanny/` | Minimal VARA ini: varanny reads the port to advertise from here |
 | `xara/xara-hf.conf`, `xara-fm.conf` | `/usr/local/etc/xara/` (or `~/.config/xara/`) | xara settings per radio |
 | `xara/asoundrc` | `~/.asoundrc` of the user running varanny | Includes the generated `pcm.<radio>` definitions |
@@ -114,6 +115,11 @@ wrapper and ini file, and a `Modems` entry in `varanny.json`. Then
 * FreeBSD virtual channels let several programs record from one Digirig, so
   `xara-monitor --audio alsa --capture g90` (VARA HF only) can run next to
   xara.
+* RadioMail asks varanny to stop the modem right after it asks xara to
+  disconnect, and varanny stops it with SIGTERM. If xara exits then, the
+  other station never sees the link close and keeps retrying.
+  `xara-varanny` holds the SIGTERM until xara reports `DISCONNECTED`
+  (at most 20 s).
 * The wrappers use `--addr 0.0.0.0` so remote clients can reach xara; its
   command, data and KISS ports are unauthenticated, so keep them on a trusted
   LAN.

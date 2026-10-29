@@ -1,3 +1,3 @@
 #!/bin/sh
 # Started by varanny in place of VARA FM; varanny passes VARA's Args, which xara ignores.
-exec /usr/local/bin/xara --config /usr/local/etc/xara/xara-fm.conf --addr 0.0.0.0 --registered
+exec /usr/local/libexec/xara-varanny /usr/local/etc/xara/xara-fm.conf
