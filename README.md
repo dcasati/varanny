@@ -215,6 +215,24 @@ Ensure VARA is installed in its default location and wine executable is in the P
 }
 ```
 
+### Running on FreeBSD
+VARA itself does not run on FreeBSD, but `varanny` can launch a VARA-compatible modem such as [xara](https://github.com/x0rro/xara). See [sample-configs/varanny.freebsd.json](sample-configs/varanny.freebsd.json). Serial ports are `/dev/cuaU*`, and `rigctld` can either be started by `varanny` (`CatCtrl.Cmd`) or run as a system service (omit `CatCtrl.Cmd`).
+
+`varanny` passes `Args` to the modem as a single argument, so use a small wrapper script when the modem needs several flags, for example `/usr/local/bin/xara-varahf`:
+```
+#!/bin/sh
+exec /usr/local/bin/xara --addr 0.0.0.0 --registered
+```
+
+`varanny` still reads the port to advertise from the `.ini` file, so point `DefaultConfig` at a minimal one:
+```
+[Setup]
+TCP Command Port=8300
+
+[Soundcard]
+Input Device Name=USB PnP Sound Device
+```
+
 ## RadioMail Integration 
 
 [RadioMail](https://radiomail.app), the winlink email app for iOS has integrated native support for `varanny`. See it in action:
