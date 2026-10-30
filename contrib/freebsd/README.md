@@ -157,3 +157,122 @@ the Linuxulator.
   the same xara.
 * One radio can only do one thing: graywolf and a varanny FM session share
   the FT-818.
+
+### graywolf step by step
+
+Run these as root unless noted; `radio` is the account that owns the Digirig
+`~/.asoundrc` (replace it with yours).
+
+1. Linux ALSA libraries for graywolf-modem:
+
+   ```sh
+   pkg install linux-rl9-alsa-lib linux-rl9-alsa-plugins-oss
+   ```
+
+2. Release binaries (check the
+   [releases](https://github.com/chrissnell/graywolf/releases) for the latest):
+
+   ```sh
+   v=0.14.14
+   fetch https://github.com/chrissnell/graywolf/releases/download/v$v/graywolf_${v}_linux_x86_64.tar.gz
+   tar -xzf graywolf_${v}_linux_x86_64.tar.gz graywolf graywolf-modem
+   install -d /usr/local/libexec/graywolf
+   install -m 755 graywolf graywolf-modem /usr/local/libexec/graywolf/
+   brandelf -t Linux /usr/local/libexec/graywolf/graywolf
+   brandelf -t Linux /usr/local/libexec/graywolf/graywolf-modem
+   install -m 555 libexec/graywolf-run /usr/local/libexec/graywolf/
+   install -m 555 rc.d/graywolf /usr/local/etc/rc.d/
+   ```
+
+3. Check that the Digirigs show up (as `radio`, after `digirig-link` has run):
+
+   ```sh
+   /usr/local/libexec/graywolf/graywolf-modem --list-audio
+   ```
+
+   Expect `ft818` / `g90` entries described as "Digirig ...".
+
+4. Create the data directory and the admin user *before* exposing the UI
+   (as `radio`). The command reads the password twice from stdin:
+
+   ```sh
+   d=~/.local/share/graywolf
+   mkdir -p $d
+   openssl rand -base64 18 > $d/admin-password
+   chmod 600 $d/admin-password
+   (cat $d/admin-password; cat $d/admin-password) |
+       /usr/local/libexec/graywolf/graywolf auth set-password --user admin -config $d/graywolf.db
+   ```
+
+5. Enable and start the service:
+
+   ```sh
+   sysrc graywolf_enable=YES graywolf_runas=radio
+   # optional: graywolf_http=0.0.0.0:8088 graywolf_dir=... graywolf_log=...
+   service graywolf start
+   service graywolf status
+   ```
+
+   The web UI is on `http://<host>:8088/`; log in as `admin`.
+
+6. Configure it, either in the UI or with the REST API (as `radio`):
+
+   ```sh
+   d=~/.local/share/graywolf; api=http://127.0.0.1:8088/api; jar=$d/.cookies
+   curl -s -c $jar -H 'Content-Type: application/json' \
+       -d "{\"username\":\"admin\",\"password\":\"$(cat $d/admin-password)\"}" $api/auth/login
+   gw() {
+       if [ -n "${3-}" ]; then
+           curl -s -b $jar -X "$1" -H "Content-Type: application/json" -d "$3" "$api$2"
+       else
+           curl -s -b $jar -X "$1" "$api$2"
+       fi
+       echo
+   }
+
+   # station
+   gw PUT /station/config '{"callsign":"N0CALL"}'
+
+   # FT-818 Digirig: input (id 1) and output (id 2)
+   gw POST /audio-devices '{"name":"FT-818 RX","direction":"input","source_type":"soundcard","device_path":"ft818","sample_rate":48000,"channels":1,"format":"s16le","gain_db":0}'
+   gw POST /audio-devices '{"name":"FT-818 TX","direction":"output","source_type":"soundcard","device_path":"ft818","sample_rate":48000,"channels":1,"format":"s16le","gain_db":-12}'
+
+   # channel 1: VHF APRS, 1200 baud AFSK on the FT-818
+   gw POST /channels '{"name":"VHF 144.390 (FT-818)","mode":"aprs","input_device_id":1,"input_channel":0,"output_device_id":2,"output_channel":0,"modem_type":"afsk","bit_rate":1200,"mark_freq":1200,"space_freq":2200,"profile":"A","num_slicers":1,"fix_bits":"none","num_decoders":1}'
+
+   # PTT for channel 1 through the FT-818 rigctld
+   gw POST /ptt '{"channel_id":1,"method":"rigctld","device_path":"127.0.0.1:4533","slot_time_ms":10,"persist":63}'
+
+   # channel 2: KISS-only (no audio), fed by xara on the G90
+   gw POST /channels '{"name":"HF xara (G90)","mode":"aprs","input_device_id":null,"output_device_id":0,"modem_type":"afsk","bit_rate":1200,"mark_freq":1200,"space_freq":2200,"profile":"A","num_slicers":1,"fix_bits":"none","num_decoders":1}'
+
+   # KISS client to xara's KISS port, bound to channel 2
+   gw POST /kiss '{"type":"tcp-client","remote_host":"127.0.0.1","remote_port":8100,"channel":2,"mode":"tnc","allow_tx_from_governor":true,"reconnect_init_ms":2000,"reconnect_max_ms":60000}'
+   ```
+
+   Ports 4533 (FT-818 rigctld) and 8100 (xara KISS) are the ones used here;
+   check yours in `digirig.conf` and `xara.conf`.
+
+7. Keep xara running for the HF channel and let varanny share it:
+
+   ```sh
+   install -m 555 rc.d/xara_hf /usr/local/etc/rc.d/
+   install -m 555 bin/xara-varahf /usr/local/bin/
+   sysrc xara_hf_enable=YES xara_hf_runas=radio
+   service xara_hf start
+   ```
+
+8. Verify:
+
+   ```sh
+   gw GET /channels/1/stats     # rx_frames grows as packets decode
+   gw GET '/packets?limit=5'
+   gw GET /kiss                 # the xara client should be connected
+   tail -f /var/log/graywolf.log
+   ```
+
+   If decodes are missing, check the radio's squelch (open it) and the Digirig
+   capture level, e.g. `mixer -f /dev/mixer5 mic=0.10`. Use `-f`:
+   `mixer -d` changes `hw.snd.default_unit`.
+
+Beacons, digipeater and iGate are off until you configure them in the UI.
