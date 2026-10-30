@@ -51,6 +51,7 @@ sound card.
 | `devd/digirig-link.conf` | `/usr/local/etc/devd/digirig-link.conf` | Re-runs `digirig-link` when a `pcm` or `uslcom` device attaches or detaches |
 | `rc.d/rigctld` | `/usr/local/etc/rc.d/rigctld` | One `rigctld` per radio in `digirig.conf` |
 | `rc.d/varanny` | `/usr/local/etc/rc.d/varanny` | Runs `varanny` as the station user |
+| `rc.d/xara_hf`, `rc.d/graywolf`, `libexec/graywolf-run` | `/usr/local/etc/rc.d/`, `/usr/local/libexec/graywolf/` | Optional: always-on xara for HF and graywolf APRS (see below) |
 | `bin/xara-varahf`, `bin/xara-varafm` | `/usr/local/bin/` | Wrappers: varanny passes `Args` as one argument, xara needs several |
 | `libexec/xara-varanny` | `/usr/local/libexec/xara-varanny` | Runs xara for the wrappers and holds varanny's SIGTERM until an open link has disconnected (max 20 s) |
 | `etc/varanny/xara-hf.ini`, `xara-fm.ini` | `/usr/local/etc/varanny/` | Minimal VARA ini: varanny reads the port to advertise from here |
@@ -133,3 +134,26 @@ wrapper and ini file, and a `Modems` entry in `varanny.json`. Then
 * Menu 14 CAT RATE: match `digirig.conf` (38400 here).
 * Mode PKT with menu 25 PKT RATE 1200 for narrow VARA FM (rear DATA jack).
 * Menu 40 PKT MIC sets TX level; start around 50 with `drive-db = -10`.
+
+## Optional: graywolf APRS alongside xara
+
+[graywolf](https://github.com/chrissnell/graywolf) can run APRS on VHF with its
+own AFSK modem and on HF through xara's KISS port. Its Linux release runs under
+the Linuxulator.
+
+* Install `linux-rl9-alsa-lib` and `linux-rl9-alsa-plugins-oss`, unpack the
+  release into `/usr/local/libexec/graywolf/`, brand both binaries with
+  `brandelf -t Linux`, and install `libexec/graywolf-run` next to them.
+* `digirig-link` gives each `pcm.<radio>` an ALSA `hint`, which is what makes
+  cpal (and graywolf) list it: use `ft818`/`g90` as the device path.
+* Keep graywolf's data out of `/var/db`: `/compat/linux/var/db` shadows it for
+  Linux binaries. `rc.d/graywolf` uses `~/.local/share/graywolf`.
+* Before listening on `0.0.0.0`, create the admin user so nobody on the LAN can:
+  `graywolf auth set-password --user admin -config <dir>/graywolf.db`.
+* PTT: method `rigctld`, device `127.0.0.1:<rigctld port>`.
+* HF: a KISS-only channel plus a `tcp-client` KISS interface (TNC mode) to
+  xara's KISS port. That needs xara running all the time, so enable
+  `rc.d/xara_hf`; `bin/xara-varahf` then just waits while varanny clients use
+  the same xara.
+* One radio can only do one thing: graywolf and a varanny FM session share
+  the FT-818.

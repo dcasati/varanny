@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# PROVIDE: xara_hf
+# REQUIRE: LOGIN NETWORKING rigctld
+# KEYWORD: shutdown
+#
+# Always-on xara for the HF radio, shared by varanny clients (command port)
+# and graywolf (KISS port).
+#
+# xara_hf_enable (bool):  Set to YES to enable. Default: NO
+# xara_hf_runas (str):    Run as this user (needs ~/.asoundrc). Default: radio
+# xara_hf_config (str):   xara config file.
+# xara_hf_log (str):      Log file. Default: /var/log/xara-hf.log
+
+. /etc/rc.subr
+
+name=xara_hf
+rcvar=xara_hf_enable
+load_rc_config $name
+
+: ${xara_hf_enable:=NO}
+: ${xara_hf_runas:=radio}
+: ${xara_hf_config:=/home/${xara_hf_runas}/.config/xara/xara.conf}
+: ${xara_hf_log:=/var/log/xara-hf.log}
+
+pidfile=/var/run/${name}/${name}.pid
+command=/usr/sbin/daemon
+command_args="-r -R 15 -P ${pidfile} -o ${xara_hf_log} -u ${xara_hf_runas} /usr/bin/env HOME=/home/${xara_hf_runas} /usr/local/libexec/xara-varanny ${xara_hf_config}"
+start_precmd=xara_hf_precmd
+
+xara_hf_precmd()
+{
+	install -d -o ${xara_hf_runas} -m 755 /var/run/${name}
+	[ -e ${xara_hf_log} ] || install -o ${xara_hf_runas} -m 644 /dev/null ${xara_hf_log}
+}
+
+run_rc_command "$1"

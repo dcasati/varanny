@@ -1,0 +1,6 @@
+#!/bin/sh
+# graywolf-run DIR HTTP: start graywolf with its databases and tiles in DIR.
+dir=$1
+cd "$dir" || exit 1
+exec /usr/local/libexec/graywolf/graywolf -config "$dir/graywolf.db" \
+	-history-db "$dir/graywolf-history.db" -tile-cache-dir "$dir/tiles" -http "$2"

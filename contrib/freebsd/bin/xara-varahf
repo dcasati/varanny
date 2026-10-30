@@ -1,3 +1,8 @@
 #!/bin/sh
-# Started by varanny in place of VARA HF; varanny passes VARA's Args, which xara ignores.
-exec /usr/local/libexec/xara-varanny /usr/local/etc/xara/xara-hf.conf
+# Started by varanny in place of VARA HF. varanny passes VARA's Args, which xara ignores.
+# When the always-on xara_hf service is enabled, varanny clients share it: just wait
+# here until varanny stops us. Otherwise run xara for this session.
+if service xara_hf enabled; then
+	exec /bin/sleep 2147483647
+fi
+exec /usr/local/libexec/xara-varanny /home/radio/.config/xara/xara.conf

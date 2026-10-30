@@ -30,7 +30,7 @@ grep -v "^#" $conf | while read radio serial rest; do
 		done
 	fi
 	if [ -n "$dsp" ]; then
-		printf "pcm.%s { type plug slave.pcm { type oss device \"%s\" } }\n" $radio $dsp >> $tmp
+		printf "pcm.%s { type plug slave.pcm { type oss device \"%s\" } hint { show on description \"Digirig %s\" } }\n" $radio $dsp $radio >> $tmp
 		logger -t digirig-link "$radio -> $dsp"
 	else
 		echo "# $radio: Digirig $serial not connected" >> $tmp

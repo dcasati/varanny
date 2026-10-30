@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# PROVIDE: graywolf
+# REQUIRE: LOGIN NETWORKING linux rigctld
+# KEYWORD: shutdown
+#
+# graywolf APRS station (Linux release binaries under the Linuxulator).
+#
+# graywolf_enable (bool):  Set to YES to enable. Default: NO
+# graywolf_runas (str):     Run as this user (needs ~/.asoundrc for the Digirig PCMs).
+# graywolf_dir (str):      Data directory (config and history databases, tiles).
+# graywolf_http (str):     Web UI listen address. Default: 0.0.0.0:8088
+# graywolf_log (str):      Log file. Default: /var/log/graywolf.log
+
+. /etc/rc.subr
+
+name=graywolf
+rcvar=graywolf_enable
+load_rc_config $name
+
+: ${graywolf_enable:=NO}
+: ${graywolf_runas:=radio}
+: ${graywolf_dir:=/home/${graywolf_runas}/.local/share/graywolf}
+: ${graywolf_http:=0.0.0.0:8088}
+: ${graywolf_log:=/var/log/graywolf.log}
+
+pidfile=/var/run/${name}/${name}.pid
+procname=/usr/sbin/daemon
+command=/usr/sbin/daemon
+command_args="-r -R 5 -P ${pidfile} -o ${graywolf_log} -u ${graywolf_runas} /usr/bin/env HOME=/home/${graywolf_runas} /usr/local/libexec/graywolf/graywolf-run ${graywolf_dir} ${graywolf_http}"
+start_precmd=graywolf_precmd
+
+graywolf_precmd()
+{
+	install -d -o ${graywolf_runas} -m 755 /var/run/${name}
+	[ -e ${graywolf_log} ] || install -o ${graywolf_runas} -m 644 /dev/null ${graywolf_log}
+	[ -d ${graywolf_dir} ] || install -d -o ${graywolf_runas} ${graywolf_dir}
+}
+
+run_rc_command "$1"
